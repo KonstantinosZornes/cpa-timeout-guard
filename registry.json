@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "plugins": [
+    {
+      "id": "cpa-timeout-guard",
+      "name": "CPA Timeout Guard",
+      "description": "Adds configurable deadlines to CLIProxyAPI model requests, starting with time to first token for streaming HTTP requests.",
+      "author": "KonstantinosZornes",
+      "repository": "https://github.com/KonstantinosZornes/cpa-timeout-guard",
+      "homepage": "https://github.com/KonstantinosZornes/cpa-timeout-guard",
+      "license": "MIT",
+      "tags": [
+        "Timeout",
+        "Streaming",
+        "Reliability"
+      ]
+    }
+  ]
+}

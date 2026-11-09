@@ -1,0 +1,9 @@
+/dist/
+/release/
+/cpa/
+/plugin/*.so
+/plugin/*.dylib
+/plugin/*.dll
+/plugin/*.h
+/plugin/*.test
+/plugin/coverage.out

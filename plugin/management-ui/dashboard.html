@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>CPA Timeout Guard</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --page: #f3f6fb;
+        --panel: #ffffff;
+        --panel-soft: #f7f9fc;
+        --ink: #182235;
+        --muted: #66758b;
+        --line: #e3e9f1;
+        --accent: #315fce;
+        --accent-strong: #244fb5;
+        --accent-soft: #edf3ff;
+        --green: #18845b;
+        --green-soft: #e8f7f0;
+        --amber: #946000;
+        --amber-soft: #fff5d9;
+        --red: #b53c45;
+        --red-soft: #fff0f0;
+        --shadow: 0 18px 50px rgba(29, 47, 79, 0.08);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --page: #0f1725;
+          --panel: #172235;
+          --panel-soft: #1b2a41;
+          --ink: #e8edf7;
+          --muted: #a3b0c5;
+          --line: #2b3b54;
+          --accent: #8eafff;
+          --accent-strong: #a8bfff;
+          --accent-soft: #203357;
+          --green: #6fdbac;
+          --green-soft: #173d34;
+          --amber: #ffd278;
+          --amber-soft: #49391c;
+          --red: #ff9da3;
+          --red-soft: #48262d;
+          --shadow: 0 18px 50px rgba(0, 0, 0, 0.2);
+        }
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(ellipse at 78% 0%, rgba(49, 95, 206, 0.09), transparent 35rem),
+          var(--page);
+        color: var(--ink);
+        font: 15px/1.55 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        min-height: 100vh;
+      }
+
+      .shell { width: min(1100px, calc(100% - 40px)); margin: 0 auto; padding: 42px 0 56px; }
+      .topline { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 34px; }
+      .brand { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 12px; font-weight: 750; letter-spacing: .13em; text-transform: uppercase; }
+      .brand-mark { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 11px; background: var(--accent); color: #fff; font-size: 14px; letter-spacing: 0; box-shadow: 0 8px 18px rgba(49, 95, 206, .2); }
+      .connection { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+      .connection-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px var(--green-soft); }
+      .connection.error .connection-dot { background: var(--red); box-shadow: 0 0 0 4px var(--red-soft); }
+
+      .hero { max-width: 760px; margin-bottom: 30px; }
+      .eyebrow { color: var(--accent); font-size: 12px; font-weight: 760; letter-spacing: .12em; text-transform: uppercase; }
+      h1 { margin: 8px 0 10px; font-size: clamp(34px, 5vw, 50px); letter-spacing: -.045em; line-height: 1.08; }
+      .hero p { max-width: 690px; margin: 0; color: var(--muted); font-size: 17px; }
+
+      .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 28px 0 20px; }
+      .summary-card, .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); }
+      .summary-card { min-height: 118px; padding: 19px 21px; }
+      .summary-label { display: block; color: var(--muted); font-size: 12px; font-weight: 720; letter-spacing: .08em; text-transform: uppercase; }
+      .summary-value { margin-top: 10px; font-size: 20px; font-weight: 740; letter-spacing: -.025em; }
+      .summary-value .dot { display: inline-block; width: 9px; height: 9px; margin-right: 8px; border-radius: 50%; background: var(--muted); vertical-align: 1px; }
+      .summary-value.enabled .dot { background: var(--green); }
+      .summary-value.disabled .dot { background: var(--amber); }
+      .summary-note { margin-top: 2px; color: var(--muted); font-size: 13px; }
+
+      .content { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(270px, .85fr); align-items: start; gap: 18px; }
+      .panel { padding: 24px; }
+      .panel-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 22px; }
+      h2 { margin: 0; font-size: 19px; letter-spacing: -.025em; }
+      .panel-heading p { margin: 5px 0 0; color: var(--muted); font-size: 13px; }
+      .source { padding: 6px 10px; border-radius: 99px; background: var(--panel-soft); color: var(--muted); font-size: 11px; font-weight: 750; letter-spacing: .04em; white-space: nowrap; }
+      .source.override { background: var(--accent-soft); color: var(--accent); }
+
+      .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 0; border-top: 1px solid var(--line); }
+      .setting-title { font-weight: 690; }
+      .setting-description { max-width: 470px; margin-top: 3px; color: var(--muted); font-size: 13px; }
+      .switch { position: relative; flex: 0 0 auto; width: 48px; height: 28px; }
+      .switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+      .switch-track { position: absolute; inset: 0; border-radius: 99px; background: #aab4c3; cursor: pointer; transition: background .18s ease; }
+      .switch-track::after { content: ""; position: absolute; top: 4px; left: 4px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: transform .18s ease; }
+      .switch input:checked + .switch-track { background: var(--accent); }
+      .switch input:checked + .switch-track::after { transform: translateX(20px); }
+      .switch input:focus-visible + .switch-track { outline: 3px solid color-mix(in srgb, var(--accent) 32%, transparent); outline-offset: 3px; }
+
+      .field { padding: 18px 0 17px; border-top: 1px solid var(--line); }
+      .field-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 9px; }
+      label { font-weight: 690; }
+      .field-hint { color: var(--muted); font-size: 12px; }
+      .input-wrap { display: flex; align-items: center; gap: 12px; }
+      input[type="text"] { width: min(240px, 100%); height: 44px; padding: 0 13px; border: 1px solid var(--line); border-radius: 10px; outline: 0; background: var(--panel-soft); color: var(--ink); font: inherit; font-weight: 650; }
+      input[type="text"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+      .input-help { color: var(--muted); font-size: 13px; }
+      .presets { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+      .preset { border: 1px solid var(--line); border-radius: 8px; padding: 5px 9px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+      .preset:hover { border-color: var(--accent); color: var(--accent); }
+
+      .notice { display: none; margin: 14px 0 0; padding: 11px 13px; border-radius: 10px; font-size: 13px; }
+      .notice.show { display: block; }
+      .notice.success { background: var(--green-soft); color: var(--green); }
+      .notice.error { background: var(--red-soft); color: var(--red); }
+      .actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 9px; padding-top: 19px; border-top: 1px solid var(--line); }
+      .button { min-height: 40px; padding: 0 15px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--ink); font: inherit; font-size: 13px; font-weight: 680; cursor: pointer; }
+      .button:hover { border-color: var(--accent); }
+      .button.primary { border-color: var(--accent); background: var(--accent); color: #fff; }
+      .button.primary:hover { background: var(--accent-strong); }
+      .button:disabled { opacity: .55; cursor: wait; }
+
+      .info-card { padding: 20px; }
+      .info-card + .info-card { margin-top: 14px; }
+      .info-card h2 { margin-bottom: 15px; }
+      .steps { display: grid; gap: 13px; }
+      .step { display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start; }
+      .step-index { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 750; }
+      .step strong { display: block; font-size: 13px; }
+      .step span:last-child { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; }
+      .callout { border-radius: 12px; padding: 14px; background: var(--amber-soft); color: var(--amber); font-size: 12px; }
+      .callout strong { display: block; margin-bottom: 3px; }
+      .footer { margin-top: 20px; color: var(--muted); font-size: 12px; text-align: center; }
+      .footer code { padding: 2px 5px; border-radius: 5px; background: var(--panel-soft); font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .loading { color: var(--muted); }
+
+      @media (max-width: 760px) {
+        .shell { width: min(100% - 24px, 600px); padding-top: 24px; }
+        .summary { grid-template-columns: 1fr; gap: 9px; }
+        .summary-card { min-height: auto; padding: 15px 17px; }
+        .summary-value { margin-top: 5px; }
+        .content { grid-template-columns: 1fr; }
+        .panel { padding: 18px; }
+        .topline { margin-bottom: 27px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <div class="topline">
+        <div class="brand"><span class="brand-mark">TG</span><span data-i18n="brand">CLIProxyAPI · Plugin</span></div>
+        <div class="connection" id="connection"><span class="connection-dot"></span><span id="connectionText" data-i18n="connecting">Connecting to CPA</span></div>
+      </div>
+
+      <header class="hero">
+        <div class="eyebrow" data-i18n="eyebrow">Request reliability</div>
+        <h1 data-i18n="title">Timeout Guard</h1>
+        <p data-i18n="intro">Set a deadline for the first meaningful token. Once output begins, the stream continues without a total generation limit.</p>
+      </header>
+
+      <section class="summary" aria-label="Current configuration summary">
+        <article class="summary-card">
+          <span class="summary-label" data-i18n="guard">Guard</span>
+          <div class="summary-value loading" id="guardSummary"><span class="dot"></span>Loading</div>
+          <div class="summary-note" data-i18n="guardNote">Applies to supported streaming HTTP routes</div>
+        </article>
+        <article class="summary-card">
+          <span class="summary-label" data-i18n="deadline">First token deadline</span>
+          <div class="summary-value loading" id="timeoutSummary">—</div>
+          <div class="summary-note" data-i18n="deadlineNote">Measured from delegated model execution start</div>
+        </article>
+        <article class="summary-card">
+          <span class="summary-label" data-i18n="configSource">Configuration source</span>
+          <div class="summary-value loading" id="sourceSummary">—</div>
+          <div class="summary-note" data-i18n="sourceNote">Dashboard overrides are stored by the plugin</div>
+        </article>
+      </section>
+
+      <main class="content">
+        <section class="panel">
+          <div class="panel-heading">
+            <div>
+              <h2 data-i18n="settingsTitle">First token deadline</h2>
+              <p data-i18n="settingsIntro">Choose whether the guard is active and how long it waits.</p>
+            </div>
+            <span class="source" id="sourceBadge" data-i18n="loading">Loading</span>
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <div class="setting-title" data-i18n="enableGuard">Enable guard</div>
+              <div class="setting-description" data-i18n="enableDescription">Cancel streaming requests that do not produce a meaningful token before the deadline.</div>
+            </div>
+            <label class="switch" data-i18n-aria="enableGuard">
+              <input id="enabled" type="checkbox" disabled />
+              <span class="switch-track"></span>
+            </label>
+          </div>
+
+          <div class="field">
+            <div class="field-head">
+              <label for="timeout" data-i18n="maximumTime">Maximum time to first token</label>
+              <span class="field-hint" data-i18n="durationFormat">Go duration</span>
+            </div>
+            <div class="input-wrap">
+              <input id="timeout" type="text" value="30s" autocomplete="off" spellcheck="false" disabled />
+              <span class="input-help" data-i18n="durationExamples">Examples: 10s, 1500ms, 1m</span>
+            </div>
+            <div class="presets" aria-label="Timeout presets">
+              <button class="preset" type="button" data-value="10s" data-i18n="tenSeconds">10 sec</button>
+              <button class="preset" type="button" data-value="30s" data-i18n="thirtySeconds">30 sec</button>
+              <button class="preset" type="button" data-value="60s" data-i18n="sixtySeconds">60 sec</button>
+            </div>
+          </div>
+
+          <div class="notice" id="notice" role="status" aria-live="polite"></div>
+          <div class="actions">
+            <button class="button" id="resetButton" type="button" disabled data-i18n="restore">Restore config.yaml values</button>
+            <button class="button primary" id="saveButton" type="button" disabled data-i18n="save">Save settings</button>
+          </div>
+        </section>
+
+        <aside>
+          <section class="panel info-card">
+            <h2 data-i18n="howTitle">How the deadline works</h2>
+            <div class="steps">
+              <div class="step"><span class="step-index">1</span><div><strong data-i18n="step1Title">Request starts</strong><span data-i18n="step1Text">Credential selection and upstream setup are included.</span></div></div>
+              <div class="step"><span class="step-index">2</span><div><strong data-i18n="step2Title">Wait for generated output</strong><span data-i18n="step2Text">Metadata and keep-alives do not stop the timer.</span></div></div>
+              <div class="step"><span class="step-index">3</span><div><strong data-i18n="step3Title">Stream continues</strong><span data-i18n="step3Text">The deadline is removed after the first meaningful token.</span></div></div>
+            </div>
+          </section>
+          <section class="panel info-card">
+            <div class="callout"><strong data-i18n="afterStartedTitle">After a stream has started</strong><span data-i18n="afterStartedText">If metadata or a keep-alive was already sent, CPA reports the timeout as a stream error instead of changing the HTTP status.</span></div>
+          </section>
+        </aside>
+      </main>
+
+      <footer class="footer"><span data-i18n="footer">Dashboard changes are stored in</span> <code>plugins/cpa-timeout-guard.json</code><span data-i18n="footerEnd">. Use “Restore config.yaml values” to remove the override.</span></footer>
+    </div>
+
+    <script>
+      (() => {
+        const AUTH_KEY = "cli-proxy-auth";
+        const LANGUAGE_KEY = "cli-proxy-language";
+        const STORAGE_SALT = "cli-proxy-api-webui::secure-storage";
+        const AUTH_MESSAGE = "cpa:plugin-resource-auth";
+        const SETTINGS_URL = "/v0/management/cpa-timeout-guard/settings";
+        const state = { auth: null, settings: null, busy: false };
+        const $ = (id) => document.getElementById(id);
+        const dictionaries = {
+          en: {
+            brand: "CLIProxyAPI · Plugin", connecting: "Connecting to CPA", eyebrow: "Request reliability",
+            title: "Timeout Guard", intro: "Set a deadline for the first meaningful token. Once output begins, the stream continues without a total generation limit.",
+            guard: "Guard", guardNote: "Applies to supported streaming HTTP routes", deadline: "First token deadline",
+            deadlineNote: "Measured from delegated model execution start", configSource: "Configuration source",
+            sourceNote: "Dashboard overrides are stored by the plugin", settingsTitle: "First token deadline",
+            settingsIntro: "Choose whether the guard is active and how long it waits.", loading: "Loading",
+            enableGuard: "Enable guard", enableDescription: "Cancel streaming requests that do not produce a meaningful token before the deadline.",
+            maximumTime: "Maximum time to first token", durationFormat: "Go duration", durationExamples: "Examples: 10s, 1500ms, 1m",
+            tenSeconds: "10 sec", thirtySeconds: "30 sec", sixtySeconds: "60 sec", restore: "Restore config.yaml values", save: "Save settings",
+            howTitle: "How the deadline works", step1Title: "Request starts", step1Text: "Credential selection and upstream setup are included.",
+            step2Title: "Wait for generated output", step2Text: "Metadata and keep-alives do not stop the timer.",
+            step3Title: "Stream continues", step3Text: "The deadline is removed after the first meaningful token.",
+            afterStartedTitle: "After a stream has started", afterStartedText: "If metadata or a keep-alive was already sent, CPA reports the timeout as a stream error instead of changing the HTTP status.",
+            footer: "Dashboard changes are stored in", footerEnd: ". Use “Restore config.yaml values” to remove the override.",
+            waiting: "Waiting for CPA sign-in", signInRequired: "Open this page from CPA's management UI after signing in.",
+            connected: "Connected to CPA", guardEnabled: "Enabled", guardDisabled: "Disabled", deadlineDisabled: "Disabled",
+            configYamlSource: "config.yaml", dashboardSource: "Dashboard override", saving: "Saving…",
+            saved: "Settings saved. They are active for new requests.",
+            resetDone: "Dashboard override removed. Values from config.yaml are active.",
+            invalidDuration: "Enter a valid Go duration, such as 30s or 1500ms.",
+            loadFailed: "Could not load settings.", saveFailed: "Could not save settings.", resetFailed: "Could not restore config.yaml values.",
+          },
+          "zh-CN": {
+            brand: "CLIProxyAPI · 插件", connecting: "正在连接 CPA", eyebrow: "请求可靠性", title: "超时守护",
+            intro: "设置首个有效 token 的等待上限。输出开始后，流式生成不受总时长限制。", guard: "守护状态",
+            guardNote: "适用于支持的流式 HTTP 接口", deadline: "首 token 等待上限", deadlineNote: "从委托模型执行开始计时",
+            configSource: "配置来源", sourceNote: "控制面板覆盖值由插件保存", settingsTitle: "首 token 等待上限",
+            settingsIntro: "选择是否启用，以及等待多长时间。", loading: "加载中", enableGuard: "启用守护",
+            enableDescription: "在截止时间前没有有效 token 时取消流式请求。", maximumTime: "首 token 最大等待时间",
+            durationFormat: "Go 时长格式", durationExamples: "例如：10s、1500ms、1m", tenSeconds: "10 秒", thirtySeconds: "30 秒", sixtySeconds: "60 秒",
+            restore: "恢复 config.yaml 设置", save: "保存设置", howTitle: "截止时间如何计算", step1Title: "请求开始",
+            step1Text: "计时包含凭证选择和上游连接准备。", step2Title: "等待生成内容", step2Text: "元数据和 keep-alive 心跳不会结束计时。",
+            step3Title: "继续传输", step3Text: "收到首个有效 token 后停止计时。", afterStartedTitle: "流已开始后",
+            afterStartedText: "如果元数据或心跳已发出，CPA 会在流内报告超时，不会更改 HTTP 状态码。",
+            footer: "控制面板设置保存在", footerEnd: "。点击“恢复 config.yaml 设置”可移除覆盖。",
+            waiting: "等待 CPA 登录状态", signInRequired: "请从已登录的 CPA 管理界面打开此页面。", connected: "已连接 CPA",
+            guardEnabled: "已启用", guardDisabled: "已停用", deadlineDisabled: "已停用", configYamlSource: "config.yaml", dashboardSource: "控制面板覆盖",
+            saving: "保存中…", saved: "设置已保存，将用于新请求。", resetDone: "已移除控制面板覆盖，正在使用 config.yaml 设置。",
+            invalidDuration: "请输入有效的 Go 时长，例如 30s 或 1500ms。", loadFailed: "读取设置失败。", saveFailed: "保存设置失败。", resetFailed: "恢复 config.yaml 设置失败。",
+          },
+          "zh-TW": {
+            brand: "CLIProxyAPI · 外掛", connecting: "正在連線 CPA", eyebrow: "請求可靠性", title: "逾時守護",
+            intro: "設定第一個有效 token 的等待上限。輸出開始後，串流生成不受總時長限制。", guard: "守護狀態",
+            guardNote: "適用於支援的串流 HTTP 介面", deadline: "第一個 token 等待上限", deadlineNote: "從委派模型執行開始計時",
+            configSource: "設定來源", sourceNote: "控制面板覆寫值由外掛保存", settingsTitle: "第一個 token 等待上限",
+            settingsIntro: "選擇是否啟用，以及等待多久。", loading: "載入中", enableGuard: "啟用守護",
+            enableDescription: "截止時間前沒有有效 token 時取消串流請求。", maximumTime: "第一個 token 最大等待時間",
+            durationFormat: "Go 時長格式", durationExamples: "例如：10s、1500ms、1m", tenSeconds: "10 秒", thirtySeconds: "30 秒", sixtySeconds: "60 秒",
+            restore: "還原 config.yaml 設定", save: "儲存設定", howTitle: "截止時間如何計算", step1Title: "請求開始",
+            step1Text: "計時包含憑證選擇與上游連線準備。", step2Title: "等待生成內容", step2Text: "中繼資料與 keep-alive 心跳不會結束計時。",
+            step3Title: "繼續傳輸", step3Text: "收到第一個有效 token 後停止計時。", afterStartedTitle: "串流已開始後",
+            afterStartedText: "如果中繼資料或心跳已送出，CPA 會在串流內回報逾時，不會變更 HTTP 狀態碼。",
+            footer: "控制面板設定儲存在", footerEnd: "。按一下「還原 config.yaml 設定」即可移除覆寫。",
+            waiting: "等待 CPA 登入狀態", signInRequired: "請從已登入的 CPA 管理介面開啟此頁面。", connected: "已連線 CPA",
+            guardEnabled: "已啟用", guardDisabled: "已停用", deadlineDisabled: "已停用", configYamlSource: "config.yaml", dashboardSource: "控制面板覆寫",
+            saving: "儲存中…", saved: "設定已儲存，會套用於新請求。", resetDone: "已移除控制面板覆寫，正在使用 config.yaml 設定。",
+            invalidDuration: "請輸入有效的 Go 時長，例如 30s 或 1500ms。", loadFailed: "讀取設定失敗。", saveFailed: "儲存設定失敗。", resetFailed: "還原 config.yaml 設定失敗。",
+          },
+          ru: {
+            brand: "CLIProxyAPI · Плагин", connecting: "Подключение к CPA", eyebrow: "Надёжность запросов",
+            title: "Контроль тайм-аутов", intro: "Задайте срок ожидания первого значимого токена. После начала вывода поток не ограничивается общей длительностью.",
+            guard: "Контроль", guardNote: "Для поддерживаемых потоковых HTTP-маршрутов", deadline: "Срок ожидания первого токена",
+            deadlineNote: "От начала делегированного выполнения модели", configSource: "Источник настроек",
+            sourceNote: "Переопределения панели сохраняются плагином", settingsTitle: "Срок ожидания первого токена",
+            settingsIntro: "Включите контроль и задайте время ожидания.", loading: "Загрузка", enableGuard: "Включить контроль",
+            enableDescription: "Отменять потоковые запросы, если значимый токен не получен до срока.", maximumTime: "Максимальное ожидание первого токена",
+            durationFormat: "Формат длительности Go", durationExamples: "Например: 10s, 1500ms, 1m", tenSeconds: "10 сек", thirtySeconds: "30 сек", sixtySeconds: "60 сек",
+            restore: "Восстановить config.yaml", save: "Сохранить настройки", howTitle: "Как работает срок ожидания", step1Title: "Запрос начат",
+            step1Text: "Время включает выбор учётных данных и подготовку подключения.", step2Title: "Ожидание вывода модели", step2Text: "Метаданные и keep-alive не останавливают таймер.",
+            step3Title: "Поток продолжается", step3Text: "Таймер отключается после первого значимого токена.", afterStartedTitle: "После начала потока",
+            afterStartedText: "Если уже отправлены метаданные или heartbeat, CPA сообщит об ошибке в потоке, не меняя HTTP-статус.",
+            footer: "Настройки панели сохранены в", footerEnd: ". Нажмите «Восстановить config.yaml», чтобы удалить переопределение.",
+            waiting: "Ожидание входа в CPA", signInRequired: "Откройте страницу из панели CPA после входа.", connected: "Подключено к CPA",
+            guardEnabled: "Включён", guardDisabled: "Выключен", deadlineDisabled: "Отключён", configYamlSource: "config.yaml", dashboardSource: "Переопределение панели",
+            saving: "Сохранение…", saved: "Настройки сохранены и применяются к новым запросам.", resetDone: "Переопределение удалено; используются значения config.yaml.",
+            invalidDuration: "Введите допустимую длительность Go, например 30s или 1500ms.", loadFailed: "Не удалось загрузить настройки.", saveFailed: "Не удалось сохранить настройки.", resetFailed: "Не удалось восстановить config.yaml.",
+          },
+        };
+        let language = "en";
+        const t = (key) => dictionaries[language][key] || dictionaries.en[key] || key;
+
+        function readLanguage() {
+          try {
+            const stored = JSON.parse(localStorage.getItem(LANGUAGE_KEY) || "null");
+            const value = String(stored?.state?.language || stored?.language || navigator.language || "en").toLowerCase();
+            if (value.startsWith("zh-tw") || value.startsWith("zh-hk")) return "zh-TW";
+            if (value.startsWith("zh")) return "zh-CN";
+            if (value.startsWith("ru")) return "ru";
+          } catch { /* Fall back to the browser language. */ }
+          return "en";
+        }
+
+        function applyTranslations() {
+          document.documentElement.lang = language;
+          document.querySelectorAll("[data-i18n]").forEach((element) => {
+            const key = element.getAttribute("data-i18n");
+            if (key) element.textContent = t(key);
+          });
+          document.querySelectorAll("[data-i18n-aria]").forEach((element) => {
+            const key = element.getAttribute("data-i18n-aria");
+            if (key) element.setAttribute("aria-label", t(key));
+          });
+          document.title = t("title");
+        }
+
+        function decodeObfuscated(raw, prefix, version) {
+          const bytes = Uint8Array.from(atob(raw.slice(prefix.length)), (char) => char.charCodeAt(0));
+          let keyText = STORAGE_SALT;
+          if (version === "v2") keyText = `${STORAGE_SALT}|v2|${location.host}`;
+          else keyText = `${STORAGE_SALT}|${location.host}|${navigator.userAgent}`;
+          const key = new TextEncoder().encode(keyText);
+          for (let i = 0; i < bytes.length; i += 1) bytes[i] ^= key[i % key.length];
+          return JSON.parse(new TextDecoder().decode(bytes));
+        }
+
+        function readAuth() {
+          let decoded;
+          try {
+            const raw = localStorage.getItem(AUTH_KEY);
+            if (!raw) return null;
+            if (raw.startsWith("enc::v2::")) decoded = decodeObfuscated(raw, "enc::v2::", "v2");
+            else if (raw.startsWith("enc::v1::")) decoded = decodeObfuscated(raw, "enc::v1::", "v1");
+            else decoded = JSON.parse(raw);
+          } catch {
+            return null;
+          }
+          const data = decoded?.state && typeof decoded.state === "object" ? decoded.state : decoded;
+          const managementKey = typeof data?.managementKey === "string" ? data.managementKey.trim() : "";
+          if (!managementKey) return null;
+          const apiBase = String(data?.apiBase || location.origin)
+            .replace(/\/?v0\/management\/?$/i, "")
+            .replace(/\/+$/, "");
+          return { apiBase: apiBase || location.origin, managementKey };
+        }
+
+        function acceptParentAuth(event) {
+          if (event.source !== window.parent || event.origin !== window.location.origin) return;
+          const data = event.data;
+          if (data?.type !== AUTH_MESSAGE || typeof data.apiBase !== "string" || typeof data.managementKey !== "string") return;
+          const managementKey = data.managementKey.trim();
+          if (!managementKey) return;
+          let apiOrigin;
+          try { apiOrigin = new URL(data.apiBase, window.location.origin).origin; } catch { return; }
+          if (apiOrigin !== window.location.origin) return;
+          state.auth = { apiBase: data.apiBase.replace(/\/+$/, ""), managementKey };
+          load();
+        }
+
+        function setConnection(text, error = false) {
+          $("connectionText").textContent = text;
+          $("connection").classList.toggle("error", error);
+        }
+
+        function showNotice(message, error = false) {
+          const notice = $("notice");
+          notice.textContent = message;
+          notice.className = `notice show ${error ? "error" : "success"}`;
+        }
+
+        function setBusy(busy) {
+          state.busy = busy;
+          $("enabled").disabled = busy;
+          $("timeout").disabled = busy;
+          $("saveButton").disabled = busy;
+          $("resetButton").disabled = busy;
+          document.querySelectorAll(".preset").forEach((button) => { button.disabled = busy; });
+          $("saveButton").textContent = busy ? t("saving") : t("save");
+        }
+
+        function render(settings) {
+          state.settings = settings;
+          $("enabled").checked = Boolean(settings.enabled);
+          $("timeout").value = settings.first_token_timeout || "30s";
+          $("guardSummary").className = `summary-value ${settings.enabled ? "enabled" : "disabled"}`;
+          $("guardSummary").innerHTML = `<span class="dot"></span>${settings.enabled ? t("guardEnabled") : t("guardDisabled")}`;
+          $("timeoutSummary").className = "summary-value";
+          $("timeoutSummary").textContent = settings.first_token_timeout || t("deadlineDisabled");
+          const source = settings.source === "plugin_state" ? t("dashboardSource") : t("configYamlSource");
+          $("sourceSummary").className = "summary-value";
+          $("sourceSummary").textContent = source;
+          $("sourceBadge").textContent = source;
+          $("sourceBadge").classList.toggle("override", settings.source === "plugin_state");
+          setBusy(false);
+        }
+
+        async function request(method = "GET", body) {
+          if (!state.auth) throw new Error(t("signInRequired"));
+          const authorization = /^bearer\s+/i.test(state.auth.managementKey)
+            ? state.auth.managementKey
+            : `Bearer ${state.auth.managementKey}`;
+          const response = await fetch(`${state.auth.apiBase}${SETTINGS_URL}`, {
+            method,
+            headers: {
+              Authorization: authorization,
+              Accept: "application/json",
+              ...(body ? { "Content-Type": "application/json" } : {}),
+            },
+            body: body ? JSON.stringify(body) : undefined,
+            cache: "no-store",
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok || payload.ok === false) {
+            const error = new Error(payload.code || `Request failed (${response.status})`);
+            error.status = response.status;
+            throw error;
+          }
+          return payload;
+        }
+
+        async function load() {
+          state.auth = state.auth || readAuth();
+          if (!state.auth) {
+            setConnection(t("waiting"));
+            showNotice(t("signInRequired"), false);
+            return;
+          }
+          try {
+            render(await request());
+            setConnection(t("connected"));
+          } catch (error) {
+            setConnection(t("loadFailed"), true);
+            showNotice(t("loadFailed"), true);
+          }
+        }
+
+        async function save() {
+          if (state.busy) return;
+          const timeout = $("timeout").value.trim();
+          if (!timeout) {
+            showNotice(t("invalidDuration"), true);
+            return;
+          }
+          setBusy(true);
+          try {
+            render(await request("PUT", { enabled: $("enabled").checked, first_token_timeout: timeout }));
+            setConnection(t("connected"));
+            showNotice(t("saved"));
+          } catch (error) {
+            setBusy(false);
+            showNotice(t("saveFailed"), true);
+          }
+        }
+
+        async function reset() {
+          if (state.busy) return;
+          setBusy(true);
+          try {
+            render(await request("DELETE"));
+            setConnection(t("connected"));
+            showNotice(t("resetDone"));
+          } catch (error) {
+            setBusy(false);
+            showNotice(t("resetFailed"), true);
+          }
+        }
+
+        $("saveButton").addEventListener("click", save);
+        $("resetButton").addEventListener("click", reset);
+        document.querySelectorAll(".preset").forEach((button) => {
+          button.addEventListener("click", () => { $("timeout").value = button.dataset.value; });
+        });
+        language = readLanguage();
+        applyTranslations();
+        window.addEventListener("message", acceptParentAuth);
+        load();
+      })();
+    </script>
+  </body>
+</html>
