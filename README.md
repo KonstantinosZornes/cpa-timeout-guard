@@ -61,7 +61,7 @@ plugins:
 
 The plugin registers a **CPA Timeout Guard** dashboard in CPA's plugin menu. From the dashboard you can enable or disable the guard, adjust the deadline, and restore the values from `config.yaml`.
 
-Dashboard changes are stored in `plugins/cpa-timeout-guard.json` with owner-only file permissions. They override the plugin's YAML values until you restore the YAML settings. The embedded page receives the active management session from CPAMC through a same-origin message, including when “remember password” is off. It also supports CPA's remembered `cli-proxy-auth` storage format. The plugin never persists the management credential.
+Dashboard changes are stored in `plugins/cpa-timeout-guard.json` with owner-only file permissions. They override the plugin's YAML values until you restore the YAML settings. The embedded page reads the remembered `cli-proxy-auth` entry using the same storage format as CPAStickyProxy. Sign in to CPA with “Remember password” enabled so the management key is present in that shared browser storage. The plugin never persists the management credential.
 
 
 ## Install from the plugin store

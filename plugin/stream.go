@@ -115,10 +115,12 @@ func runGuardedStream(req rpcExecutorRequest, timeout time.Duration) {
 			return
 		}
 		if len(read.chunk.Payload) > 0 {
-			if !tokenSeen && detector.observe(read.chunk.Payload) {
-				tokenSeen = true
-				stopTimer(deadline)
-				deadlineC = nil
+			if !tokenSeen {
+				if detector.observe(read.chunk.Payload) {
+					tokenSeen = true
+					stopTimer(deadline)
+					deadlineC = nil
+				}
 			}
 			if errEmit := emitPluginStreamChunk(req.StreamID, read.chunk.Payload); errEmit != nil {
 				_ = closeHostModelStream(streamID)

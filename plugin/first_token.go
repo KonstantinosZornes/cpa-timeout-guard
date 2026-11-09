@@ -22,6 +22,12 @@ func (d *tokenDetector) observe(chunk []byte) bool {
 		return false
 	}
 	d.buffer = append(d.buffer, chunk...)
+	trimmed := bytes.TrimSpace(d.buffer)
+	if !bytes.Contains(d.buffer, []byte("data:")) && json.Valid(trimmed) {
+		raw := bytes.Clone(trimmed)
+		d.buffer = nil
+		return meaningfulTokenEvent(d.format, raw)
+	}
 	for {
 		start, width := findEventBoundary(d.buffer)
 		if start < 0 {
